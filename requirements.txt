@@ -1,0 +1,16 @@
+einops
+torch
+torchaudio
+descript-audiotools
+lightning
+
+transformers
+datasets[audio]
+
+hydra-core==1.3.2
+hydra-colorlog==1.2.0
+
+rootutils
+pre-commit
+pytest
+rich
