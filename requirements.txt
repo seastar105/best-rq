@@ -1,7 +1,6 @@
 einops
 torch
 torchaudio
-descript-audiotools
 lightning
 
 transformers
@@ -14,3 +13,6 @@ rootutils
 pre-commit
 pytest
 rich
+
+lhotse
+descript-audiotools
