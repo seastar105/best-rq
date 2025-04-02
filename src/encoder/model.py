@@ -38,7 +38,8 @@ class SpeechEncoder(nn.Module):
             # x: (batch_size, time), in case input is waveform
             x = self.mel_transform.extract_batch(x, sampling_rate=self.config.mel.sampling_rate)
             lengths = self.wav_lengths_to_mel_lengths(lengths)
+
         x, lengths = self.conv_subsampler(x, lengths)
         attention_mask = self.lengths_to_attention_mask(lengths)
         embs = self.transformer(x, attention_mask=attention_mask)
-        return embs
+        return embs, lengths

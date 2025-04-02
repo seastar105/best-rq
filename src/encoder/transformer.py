@@ -135,7 +135,6 @@ class SelfAttention(nn.Module):
         if rotary_emb is not None:
             q = apply_rotary_pos_emb(rotary_emb, q)
             k = apply_rotary_pos_emb(rotary_emb, k)
-
         seq_len = x.size(1)
         attention_mask = self.get_attention_mask(seq_len, x.device, attention_mask)
         causal = self.causal if attention_mask is None else False
@@ -185,6 +184,19 @@ class Transformer(nn.Module):
         self.final_norm = norm_class(config.dim)
         self.dropout = nn.Dropout(config.residual_dropout)
 
+    def expand_attention_mask(self, attention_mask: Optional[torch.Tensor] = None):
+        if attention_mask is None:
+            return None
+        if attention_mask.ndim == 2:
+            # (B, T) -> (B, 1, 1, T), padding mask
+            attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
+        elif attention_mask.ndim == 3:
+            # (B, T, T) -> (B, 1, T, T), causal mask
+            attention_mask = attention_mask.unsqueeze(1)
+        else:
+            raise ValueError("Invalid attention mask shape")
+        return attention_mask
+
     def forward(
         self,
         embs: torch.Tensor,
@@ -195,12 +207,13 @@ class Transformer(nn.Module):
             position_ids = torch.arange(embs.size(1), device=embs.device).unsqueeze(0).expand(embs.size(0), -1)
 
         if self.config.positional_encoding.type == "absolute":
-            x = embs + self.pos_emb(position_ids)
+            embs = embs + self.pos_emb(position_ids)
             rotary_emb = None
         elif self.config.positional_encoding.type == "rotary":
             rotary_emb = self.pos_emb(position_ids)
 
+        attention_mask = self.expand_attention_mask(attention_mask)
         for layer in self.layers:
-            x = layer(embs, attention_mask, rotary_emb)
+            embs = layer(embs, attention_mask, rotary_emb)
 
-        return self.final_norm(x)
+        return self.final_norm(embs)
