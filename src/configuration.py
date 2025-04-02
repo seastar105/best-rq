@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Union
+from typing import Optional, Tuple, Union
 
 
 @dataclasses.dataclass
@@ -33,18 +33,49 @@ class SubSamplerConfig:
 
 
 @dataclasses.dataclass
-class MLPConfig:
-    pass
+class FeedForwardConfig:
+    """Configuration class for the ."""
+
+    type: str = "glu"  # or "vanilla"
+    activation: str = "swish"
+    dim: int = 512
+    intermediate_dim: int = 2048
+    dropout: float = 0.0
 
 
 @dataclasses.dataclass
-class AttnetionConfig:
-    pass
+class AttentionConfig:
+    """Configuration class for the Attention module."""
+
+    dim: int = 512
+    num_heads: int = 4
+    dropout: float = 0.0
+    attention_window: Optional[Tuple[int, int]] = None
+    causal: bool = False
+
+
+@dataclasses.dataclass
+class PositionalEncodingConfig:
+    """Configuration class for the Positional Encoding module."""
+
+    type: str = "rotary"  # or "absolute", "chunk-wise-absolute"
+    dim: int = 512  # Hidden dimension if type is "absolute", or head dimension if type is "rotary"
+    max_len: int = 512  # Maximum length of the input sequence, used for absolute positional encoding
+    rope_theta: float = 10000.0  # Used for rotary positional encoding
 
 
 @dataclasses.dataclass
 class TransformerConfig:
-    pass
+    """Configuration class for the Transformer Encoder."""
+
+    num_layers: int = 4
+    dim: int = 512
+    attention: AttentionConfig = AttentionConfig()
+    feed_forward: FeedForwardConfig = FeedForwardConfig()
+    positional_encoding: PositionalEncodingConfig = PositionalEncodingConfig()
+    norm_type: str = "layernorm"  # or "rmsnorm"
+    causal: bool = False
+    residual_dropout: float = 0.0
 
 
 @dataclasses.dataclass
@@ -54,9 +85,9 @@ class ConvModuleConfig:
 
 @dataclasses.dataclass
 class ConformerConfig:
-    conv_module_config: ConvModuleConfig
-    attention_config: AttnetionConfig
-    mlp_config: MLPConfig
+    conv_module: ConvModuleConfig = ConvModuleConfig()
+    attention: AttentionConfig = AttentionConfig()
+    feed_forward: FeedForwardConfig = FeedForwardConfig()
     causal: bool = False
 
 
@@ -66,7 +97,7 @@ class EncoderConfig:
     Waveform -> Mel Spectrogram -> Convolutional Subsampler -> Transformer Encoder
     """
 
-    mel_config: MelSpectrogramConfig
-    subsampler_config: SubSamplerConfig
-    transformer_config: Union[TransformerConfig, ConformerConfig]
+    mel: MelSpectrogramConfig = MelSpectrogramConfig()
+    subsampler: SubSamplerConfig = SubSamplerConfig()
+    transformer: Union[TransformerConfig, ConformerConfig] = TransformerConfig()
     causal: bool = False

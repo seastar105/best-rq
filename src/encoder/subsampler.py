@@ -98,5 +98,5 @@ class ConvolutionalSubSampler(nn.Module):
             x = x.transpose(1, 2)
         x = self.out_proj(x)
         if lengths is not None:
-            lengths = lengths // self.subsampling_factor
-        return x
+            lengths = (lengths + self.subsampling_factor - 1) // self.subsampling_factor
+        return x, lengths
