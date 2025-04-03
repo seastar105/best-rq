@@ -16,3 +16,4 @@ rich
 
 lhotse
 descript-audiotools
+jiwer

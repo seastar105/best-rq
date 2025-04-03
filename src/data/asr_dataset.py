@@ -3,11 +3,15 @@ import importlib
 import json
 import random
 import string
+from typing import Optional
 
 import torch
 from audiotools import AudioSignal
 from torch.utils.data import Dataset
 from transformers import AutoTokenizer
+
+from src.configuration import MelSpectrogramConfig
+from src.data.fbank import get_mel_transform
 
 
 def upper_no_punc(text):
@@ -24,6 +28,7 @@ def import_from_string(path: str):
 class ASRDatasetConfig:
     jsonl_path: str
     tokenizer_path: str
+    mel_config: Optional[MelSpectrogramConfig] = MelSpectrogramConfig()
     sampling_rate: int = 16000
     max_duration: float = 20.0
     min_duration: float = 0.5
@@ -41,28 +46,43 @@ class ASRDataset(Dataset):
             self.data = [json.loads(line) for line in f]
 
         self.text_proc_fn = import_from_string(config.text_proc_fn)
+        self.mel_transform = None
+        if config.mel_config is not None:
+            self.mel_transform = get_mel_transform(config.mel_config)
 
     def __len__(self):
         return len(self.data)
 
     def collate(self, batch):
         audios = [item["audio"] for item in batch]
-        lengths = [audio.shape[-1] for audio in audios]
-        max_len = max(lengths)
+        lengths = torch.LongTensor([audio.shape[-1] for audio in audios])
+        max_len = lengths.max().item()
 
         padded_audios = []
         for audio in audios:
             pad_len = max_len - audio.shape[-1]
             padded_audio = torch.nn.functional.pad(audio, (0, pad_len), value=0)
             padded_audios.append(padded_audio)
-        audios = torch.cat(padded_audios, dim=0)  # (B, T)
+        audios = torch.stack(padded_audios, dim=0)  # (B, T)
+
+        if self.mel_transform is not None:
+            audios = self.mel_transform.extract_batch(audios, sampling_rate=self.config.sampling_rate)  # list of (T, C)
+            hop_length = self.config.mel_config.hop_length
+            lengths = lengths + (hop_length // 2)
+            lengths = lengths // hop_length
+            lengths = lengths.long()
 
         labels = {"input_ids": [item["labels"] for item in batch]}
-        labels = self.tokenizer.pad(labels, padding=True, return_tensors="pt").input_ids
+        try:
+            labels = self.tokenizer.pad(labels, padding=True, return_tensors="pt").input_ids
+        except Exception as e:
+            print(f"Error during tokenization: {e}")
+            print(f"Labels: {labels}")
+            raise e
         return {
             "audio": audios,
             "labels": labels,
-            "lengths": torch.LongTensor(lengths),
+            "lengths": lengths,
         }
 
     def __getitem__(self, idx):
@@ -83,8 +103,8 @@ class ASRDataset(Dataset):
             if signal.num_channels > 1:
                 signal = signal.to_mono()
 
-            audio = signal.audio_data.squeeze(0)  # (1, T)
-            labels = self.tokenizer(text, return_tensors="pt").input_ids.squeeze()  # (L, )
+            audio = signal.audio_data.squeeze()  # (T, )
+            labels = self.tokenizer(text).input_ids  # list of int
             break
         return {
             "audio": audio,

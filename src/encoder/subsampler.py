@@ -72,13 +72,24 @@ class ConvolutionalSubSampler(nn.Module):
                     )
             layers.append(activation)
 
+        # Roughly output shape:
         # Conv2D: (B, C, T, F) -> (B, out_channels, T // subsampling_factor, F // subsampling_factor) -> (B, T // subsampling_factor, F // subsampling_factor * out_channels)
         # Conv1D: (B, C, T) -> (B, out_channels, T // subsampling_factor) -> (B, T // subsampling_factor, out_channels)
-        self.conv_outdim = (
-            config.dim_in // config.subsampling_factor * config.num_channels if self.use_conv2d else config.num_channels
-        )
+        self.conv_outdim = self.calculate_conv_outdim(config)
         self.out_proj = nn.Linear(self.conv_outdim, config.dim_out, bias=False)
         self.layers = nn.Sequential(*layers)
+
+    def calculate_conv_outdim(self, config: SubSamplerConfig):
+        last_dim = config.dim_in if self.use_conv2d else 1
+        num_layers = int(math.log(config.subsampling_factor, 2))
+
+        if self.use_conv2d:
+            for i in range(num_layers):
+                if config.causal:
+                    last_dim = (last_dim + 2) // 2  # causal conv
+                else:
+                    last_dim = last_dim // 2
+        return last_dim * config.num_channels
 
     def forward(self, x: torch.Tensor, lengths: Optional[torch.Tensor] = None):
         # x: (B, T, C)
@@ -87,7 +98,8 @@ class ConvolutionalSubSampler(nn.Module):
         else:
             x = x.transpose(1, 2)  # (B, T, C) -> (B, C, T)
 
-        x = self.layers(x)
+        for layer in self.layers:
+            x = layer(x)
 
         # flatten
         if self.use_conv2d:

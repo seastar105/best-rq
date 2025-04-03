@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Optional
 
 import torch
@@ -12,6 +13,8 @@ activation_map = {
     "gelu": nn.GELU(),
     "swish": nn.SiLU(),
 }
+
+disable_autocast = partial(torch.autocast, device_type="cuda", enabled=False)
 
 
 class FeedForward(nn.Module):
@@ -52,6 +55,7 @@ class RotaryEmbedding(nn.Module):
     def device(self):
         return next(self.buffers()).device
 
+    @disable_autocast()
     def forward(self, position_ids: torch.Tensor):
         inv_freq_expanded = self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1)
         position_ids_expanded = position_ids[:, None, :].float()
@@ -66,6 +70,7 @@ def rotate_half(x):
     return torch.cat((-x2, x1), dim=-1)
 
 
+@disable_autocast()
 def apply_rotary_pos_emb(pos, t):
     pos = pos.unsqueeze(1)
     return (t * pos.cos()) + (rotate_half(t) * pos.sin())
@@ -114,6 +119,9 @@ class SelfAttention(nn.Module):
                     mask = mask & torch.tril(torch.ones((seq_len, seq_len), dtype=torch.bool, device=device))
             return mask
 
+        if self.causal and self.attention_window is None:
+            # discard attention mask if causal only
+            return None
         if attention_mask is None:
             # if causal only, return None to make sdpa handle
             if self.causal and self.attention_window is None:
@@ -153,9 +161,9 @@ class TransformerBlock(nn.Module):
         self.config = config
 
         norm_class = nn.LayerNorm if config.norm_type == "layernorm" else nn.RMSNorm
-        self.attn_norm = norm_class(config.dim)
+        self.attn_norm = norm_class(config.dim, eps=1e-8)
         self.attn = SelfAttention(config.attention)
-        self.ff_norm = norm_class(config.dim)
+        self.ff_norm = norm_class(config.dim, eps=1e-8)
         self.ff = FeedForward(config.feed_forward)
         self.dropout = nn.Dropout(config.residual_dropout)
         self.causal = config.causal
@@ -181,7 +189,7 @@ class Transformer(nn.Module):
         else:
             raise ValueError("Unsupported positional encoding type")
         norm_class = nn.LayerNorm if config.norm_type == "layernorm" else nn.RMSNorm
-        self.final_norm = norm_class(config.dim)
+        self.final_norm = norm_class(config.dim, eps=1e-8)
         self.dropout = nn.Dropout(config.residual_dropout)
 
     def expand_attention_mask(self, attention_mask: Optional[torch.Tensor] = None):
