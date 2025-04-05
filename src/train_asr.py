@@ -17,6 +17,7 @@ from src.encoder.model import SpeechEncoder
 torch.set_float32_matmul_precision("high")
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
+torch.manual_seed(998244353)
 
 
 def main():
@@ -41,13 +42,14 @@ def main():
     valid_dataset = ASRDataset(valid_dataset_config)
     tokenizer = dataset.tokenizer
 
-    model = SpeechEncoderCTC(encoder, num_classes=len(dataset.tokenizer))
+    loss_impl = "mine"
+    model = SpeechEncoderCTC(encoder, num_classes=len(dataset.tokenizer), loss_impl=loss_impl)
 
     batch_size = 32
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, collate_fn=dataset.collate, shuffle=True, num_workers=8
     )
-    learning_rate = 1e-4
+    learning_rate = 1e-3
     epochs = 10
     total_steps = len(dataloader) * epochs
     log_interval = 100

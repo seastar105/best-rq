@@ -84,11 +84,8 @@ class ConvModuleConfig:
 
 
 @dataclasses.dataclass
-class ConformerConfig:
+class ConformerConfig(TransformerConfig):
     conv_module: ConvModuleConfig = ConvModuleConfig()
-    attention: AttentionConfig = AttentionConfig()
-    feed_forward: FeedForwardConfig = FeedForwardConfig()
-    causal: bool = False
 
 
 @dataclasses.dataclass
