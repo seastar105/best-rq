@@ -193,8 +193,6 @@ def main():
         for i in random_idx:
             print(f"Pred: '{preds[i]}' | Ref: '{refs[i]}'")
         wer = round(jiwer.wer(refs, preds) * 100, 2)
-        refs = [ref.replace(" ", "") for ref in refs]
-        preds = [pred.replace(" ", "") for pred in preds]
         cer = round(jiwer.cer(refs, preds) * 100, 2)  # type: ignore
 
         print(f"Epoch {epoch + 1} Validation Loss: {val_loss.item()} | CER: {cer:.2f} | WER: {wer:.2f}")
