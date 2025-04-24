@@ -109,8 +109,8 @@ class SpeechEncoderCTC(nn.Module):
         self.pad_token_id = blank_id
 
         CTC_LOSS_IMPL = {
-            "torch": torch.nn.CTCLoss(blank=blank_id, zero_infinity=False),
-            "mine": partial(ctc_loss, blank=blank_id, zero_infinity=False),
+            "torch": torch.nn.CTCLoss(blank=blank_id, zero_infinity=True),
+            "mine": partial(ctc_loss, blank=blank_id, zero_infinity=True),
         }
         self.ctc = CTC_LOSS_IMPL[loss_impl]
         self.num_classes = num_classes

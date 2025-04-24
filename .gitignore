@@ -1,3 +1,4 @@
+*.jsonl
 test.ipynb
 
 # Byte-compiled / optimized / DLL files

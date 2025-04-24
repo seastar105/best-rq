@@ -27,10 +27,12 @@ class SpeechEncoder(nn.Module):
         lengths = lengths // hop_length
         return lengths
 
-    def lengths_to_attention_mask(self, lengths: torch.Tensor):
+    def lengths_to_attention_mask(self, lengths: torch.Tensor, max_length: Optional[int] = None):
         if lengths is None:
             return None
-        attention_mask = torch.arange(lengths.max()).to(lengths.device) < lengths.unsqueeze(-1)
+        if max_length is None:
+            max_length = lengths.max()
+        attention_mask = torch.arange(max_length).to(lengths.device) < lengths.unsqueeze(-1)
         return attention_mask
 
     def forward(self, x: torch.Tensor, lengths: Optional[torch.Tensor] = None):
@@ -40,6 +42,6 @@ class SpeechEncoder(nn.Module):
             lengths = self.wav_lengths_to_mel_lengths(lengths)
 
         x, lengths = self.conv_subsampler(x, lengths)
-        attention_mask = self.lengths_to_attention_mask(lengths)
+        attention_mask = self.lengths_to_attention_mask(lengths, max_length=x.size(1))
         embs = self.transformer(x, attention_mask=attention_mask)
         return embs, lengths
