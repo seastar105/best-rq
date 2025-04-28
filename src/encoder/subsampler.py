@@ -76,7 +76,7 @@ class ConvolutionalSubSampler(nn.Module):
         # Conv2D: (B, C, T, F) -> (B, out_channels, T // subsampling_factor, F // subsampling_factor) -> (B, T // subsampling_factor, F // subsampling_factor * out_channels)
         # Conv1D: (B, C, T) -> (B, out_channels, T // subsampling_factor) -> (B, T // subsampling_factor, out_channels)
         self.conv_outdim = self.calculate_conv_outdim(config)
-        self.out_proj = nn.Linear(self.conv_outdim, config.dim_out, bias=False)
+        self.out_proj = nn.Linear(self.conv_outdim, config.dim, bias=False)
         self.layers = nn.Sequential(*layers)
 
     def calculate_conv_outdim(self, config: SubSamplerConfig):

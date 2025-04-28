@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 
-from src.configuration import EncoderConfig
+from src.configuration import ConformerConfig, EncoderConfig
 from src.ctc_model import SpeechEncoderCTC
 from src.data.asr_dataset import ASRDataset, ASRDatasetConfig
 from src.encoder.model import SpeechEncoder
@@ -23,7 +23,13 @@ torch.manual_seed(998244353)
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    encoder_config = EncoderConfig()
+    encoder_config = EncoderConfig(transformer=ConformerConfig())
+    # encoder_config.causal = True
+    encoder_config.transformer.dim = encoder_config.subsampler.dim = 384
+    encoder_config.transformer.feed_forward.intermediate_dim = 1024
+    encoder_config.transformer.attention.num_heads = 6
+    encoder_config.transformer.positional_encoding.dim = 64
+
     encoder = SpeechEncoder(encoder_config)
 
     dataset_config = ASRDatasetConfig(
@@ -64,7 +70,7 @@ def main():
 
     # Decay only params with 2D shapes
     param_groups = [
-        {"params": [p for p in model.parameters() if p.ndim > 1 and p.requires_grad], "weight_decay": 0.01},
+        {"params": [p for p in model.parameters() if p.ndim > 1 and p.requires_grad], "weight_decay": 0.0001},
         {"params": [p for p in model.parameters() if p.ndim == 1 and p.requires_grad], "weight_decay": 0.0},
     ]
 
@@ -75,6 +81,7 @@ def main():
 
     model.to(device)
     model.train()
+    # model = torch.compile(model)
 
     amp = True
     amp_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16

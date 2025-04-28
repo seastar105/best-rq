@@ -3,8 +3,9 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from src.configuration import EncoderConfig
+from src.configuration import ConformerConfig, EncoderConfig, TransformerConfig
 from src.data.fbank import get_mel_transform
+from src.encoder.conformer import Conformer
 from src.encoder.subsampler import ConvolutionalSubSampler
 from src.encoder.transformer import Transformer
 
@@ -16,7 +17,12 @@ class SpeechEncoder(nn.Module):
 
         self.mel_transform = get_mel_transform(config.mel)
         self.conv_subsampler = ConvolutionalSubSampler(config.subsampler)
-        self.transformer = Transformer(config.transformer)
+        if isinstance(config.transformer, ConformerConfig):
+            self.transformer = Conformer(config.transformer)
+        elif isinstance(config.transformer, TransformerConfig):
+            self.transformer = Transformer(config.transformer)
+        else:
+            raise ValueError("Unsupported transformer type")
         self.causal = config.causal
 
     def wav_lengths_to_mel_lengths(self, lengths: torch.Tensor):
